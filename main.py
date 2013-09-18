@@ -7,6 +7,7 @@ from time import sleep
 from quick2wire.gpio import pins, In, Both, Rising, PullUp
 import _thread
 import select
+import math
 
 def updateTrackData():
 	while True:
@@ -19,17 +20,18 @@ def updateTrackData():
 			display.display(metadata["title"], 3)
 
 def watchInputDevices():
-	rotaryA = pins.pin(7, direction=In, interrupt=Both, pull=PullUp)
-	rotaryB = pins.pin(0, direction=In, interrupt=Both, pull=PullUp)
+	rotaryA = pins.pin(0, direction=In, interrupt=Both, pull=PullUp)
+	rotaryB = pins.pin(7, direction=In, interrupt=Both, pull=PullUp)
 	switch = pins.pin(2, direction=In, interrupt=Rising, pull=PullUp)
-	
+
 	with rotaryA, rotaryB, switch:
-		lastActive = "a"
+		seq = (1 ^ 1) | 1 << 1
+		delta = 0
+		deltaaccu = 0
 		epoll = select.epoll()
 		epoll.register(rotaryA, select.EPOLLIN|select.EPOLLET)
 		epoll.register(rotaryB, select.EPOLLIN|select.EPOLLET)
 		epoll.register(switch, select.EPOLLIN|select.EPOLLET)
-		sleep(1)
 		while True:
 			events = epoll.poll()
 			for fileno, event in events:
@@ -38,18 +40,27 @@ def watchInputDevices():
 				else:
 					a = rotaryA.value
 					b = rotaryB.value
-					if (a == 0) and (b == 1):
-						lastActive = "b"
-					elif (b == 0) and (a == 1):
-						lastActive = "a"
-	
-					elif (a == b == 1):
-						display.loading()
-						if lastActive == "a":
-							radio.prev()
-						else:
+					newDelta = 0
+					newseq = (a ^ b) | b << 1
+					if newseq != seq:
+						newDelta = (newseq - seq) % 4
+						if newDelta == 3:
+							newDelta = -1
+						elif newDelta == 2:
+							newDelta = int(math.copysign(newDelta, delta))
+						delta = newDelta
+						deltaaccu += delta
+						if (deltaaccu >= 4):
+							deltaaccu = 0
+							print("NEXT")
+							display.loading()
 							radio.next()
-
+						elif (deltaaccu <= -4):
+							deltaaccu = 0
+							print("PREV")
+							display.loading()
+							radio.prev()
+						seq = newseq
 
 display = LCD()
 radio = Radio()
