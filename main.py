@@ -13,14 +13,14 @@ def updateTrackData():
 		metadata = radio.selectTrackUpdate()
 
 		if ("name" in metadata):
-			display.displayString(metadata["name"], 1)
+			display.display(metadata["name"], 1)
 		else:
-			display.displayString("loading...", 1)
+			display.display("loading...", 1)
  
 		if ("title" in metadata):
-			display.displayString(metadata["title"], 3)
+			display.display(metadata["title"], 3)
 		else:
-			display.displayString("loading...", 3) 
+			display.display("loading...", 3) 
 
 def watchRotaryEncoder():
 	rotaryA = pins.pin(7, direction=In, interrupt=Both, pull=PullUp)
@@ -50,7 +50,7 @@ def watchRotaryEncoder():
 						radio.next()
 
 display = LCD()
-display.displayString("HELLO WORLD", 1)
+display.display("HELLO WORLD", 1)
 radio = Radio()
 sleep(1)
 

@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 
-import display
 from time import sleep
 import re
 from quick2wire.i2c import I2CMaster, writing
-
+import unicodedata
 
 # LCD Address
 ADDRESS = 0x3f
@@ -57,9 +56,7 @@ Rs = 0b00000001 # Register select bit
 
 EMPTYLINE = "                    "
 
-class LCD(display.Display):
-	device = None
-
+class LCD(object):
 	def __init__(self):
 		self.write(0x03)
 		self.write(0x03)
@@ -88,28 +85,27 @@ class LCD(display.Display):
 			sleep(0.0005)
 			i2c.transaction(writing(0x3f, [(data & ~En) | LCD_BACKLIGHT]))
 			sleep(0.0001)
- 
-	def displayString(self, string, line):
-		#print("------------------------------------")
-		#print(string)
-		#string = string.decode("utf-8")
-		#string = string.replace(u'ü',"ue")
-		#string = string.replace(u'Ã¼', "ue")
-		#string = string.replace(u'ö',"oe")
-		#string = string.replace(u'Ã¶',"oe")
-		#string = string.replace(u'ä',"ae")
 
-		#string =  string.encode("ascii","ignore")
+	def sanitise(self, string):
+		sanitised = string.replace('ä', "ae")
+		sanitised = sanitised.replace('ö', "oe")
+		sanitised = sanitised.replace('Ã¶',"oe")
+		sanitised = sanitised.replace('ü', "ue")
+		sanitised = sanitised.replace('Ã¼', "ue")
+		return sanitised
+ 
+	def display(self, string, line):
+		string = self.sanitise(string)
 
 		if line == 1:
 			if (len(string) > 20) and (string[19] != ' '):
 				string = string[:19] + "-" + string[19:]
-			self.displayString(string[20:],2)
+			self.display(string[20:],2)
 			self.write(0x80)
 		if line == 2:
 			self.write(0xC0)
 		if line == 3:
-			self.displayString(string[20:],4)
+			self.display(string[20:],4)
 			self.write(0x94)
 		if line == 4:
 			if len(string) == 20:
