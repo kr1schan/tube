@@ -24,7 +24,7 @@ class Radio(object):
 		system("mpc play " + str(self.position))
 
 	def stop(self):
-		self.mpd.stop()
+		system("mpc stop")
 
 	def next(self):
 		self.position = self.position + 1

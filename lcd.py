@@ -4,6 +4,7 @@ from time import sleep
 import re
 from quick2wire.i2c import I2CMaster, writing
 import unicodedata
+import threading
 
 # LCD Address
 ADDRESS = 0x3f
@@ -54,9 +55,12 @@ En = 0b00000100 # Enable bit
 Rw = 0b00000010 # Read/Write bit
 Rs = 0b00000001 # Register select bit
 
-EMPTYLINE = "                    "
+EMPTYLINE = "                   "
 
 class LCD(object):
+	active = False	
+	displaySemaphore = threading.Semaphore()
+
 	def __init__(self):
 		self.write(0x03)
 		self.write(0x03)
@@ -67,7 +71,7 @@ class LCD(object):
 		self.write(LCD_DISPLAYCONTROL | LCD_DISPLAYON)
 		self.write(LCD_CLEARDISPLAY)   
 		self.write(LCD_ENTRYMODESET | LCD_ENTRYLEFT)
-		sleep(0.2)   
+		sleep(1)
 
 	def write(self, cmd, mode=0):
 		self.write4BitCode(mode | (cmd & 0xF0))
@@ -95,40 +99,56 @@ class LCD(object):
 		return sanitised
  
 	def display(self, string, line):
+		self.displaySemaphore.acquire()
+		self._display(string, line)
+		self.displaySemaphore.release()
+
+	def _display(self, string, line):
 		string = self.sanitise(string)
 
 		if line == 1:
-			if (len(string) > 20) and (string[19] != ' '):
-				string = string[:19] + "-" + string[19:]
-			self.display(string[20:],2)
+			self._wrapLine(string, line)
 			self.write(0x80)
 		if line == 2:
 			self.write(0xC0)
 		if line == 3:
-			self.display(string[20:],4)
+			self._wrapLine(string, line)
 			self.write(0x94)
 		if line == 4:
-			if len(string) == 20:
-				string[19] = "."
-				string[18] = "."
-				string[17] = "."
 			self.write(0xD4)
-
 		
-		if (len(string) > 20):
-			string = string[:20]
 		if (len(string) < 20):
 			string = string + EMPTYLINE[:20-len(string)]
+		if (len(string) > 20):
+			string = string[:20]
 
 		for char in string:
 			self.write(ord(char), Rs)
+
+	def _wrapLine(self, string, line):
+		if len(string) > 20:
+			self._display(string[20:], line+1)
+		else:
+			self._display(EMPTYLINE, line+1)
 	
 	def clear(self):
 		self.write(LCD_CLEARDISPLAY)
 		self.write(LCD_RETURNHOME)
 
-	def disable(self):
-		self.device.writeRaw(LCD_NOBACKLIGHT)
+	def disable(self):	
+		self.active = False
+		with I2CMaster() as i2c:
+			i2c.transaction(writing(0x3f, [LCD_NOBACKLIGHT]))
 
 	def enable(self):
-		self.device.writeRaw(LCD_BACKLIGHT)
+		self.active = True
+		with I2CMaster() as i2c:
+			i2c.transaction(writing(0x3f, [LCD_BACKLIGHT]))
+
+	def loading(self):
+		if self.displaySemaphore.acquire(blocking=False):
+			self._display(EMPTYLINE, 1)
+			self._display("       loading     ", 2)
+			self._display("         ...       ", 3)
+			self._display(EMPTYLINE, 4)
+			self.displaySemaphore.release()	
