@@ -101,7 +101,8 @@ class LCD(object):
  
 	def display(self, s, line):
 		self.displaySemaphore.acquire()
-		self._display(s, line)
+		if self.active:
+			self._display(s, line)
 		self.displaySemaphore.release()
 
 	def _display(self, s, line):
@@ -138,19 +139,18 @@ class LCD(object):
 		self.write(LCD_RETURNHOME)
 
 	def disable(self):	
+		self.status("stop")
 		self.active = False
-		with I2CMaster() as i2c:
-			i2c.transaction(writing(0x3f, [LCD_NOBACKLIGHT]))
 
 	def enable(self):
 		self.active = True
-		with I2CMaster() as i2c:
-			i2c.transaction(writing(0x3f, [LCD_BACKLIGHT]))
+		self.status("welcome")
 
-	def loading(self):
-		if self.displaySemaphore.acquire(blocking=False):
-			self._display(EMPTYLINE, 1)
-			self._display("       loading     ", 2)
-			self._display("         ...       ", 3)
-			self._display(EMPTYLINE, 4)
+	def status(self, status):
+		if not self.active:
+			return
+		if self.displaySemaphore.acquire():
+			print(status)
+			self.clear()
+			self._display("       " + status + "     ", 2)
 			self.displaySemaphore.release()	

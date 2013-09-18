@@ -4,14 +4,19 @@ from lcd import LCD
 from radio import Radio
 from mpd import MPDClient
 from time import sleep
-from quick2wire.gpio import pins, In, Both, Rising, PullUp
+from quick2wire.gpio import pins, In, Both, Falling, PullUp
 import _thread
 import select
 import math
 
+active = False
+
 def updateTrackData():
 	while True:
 		metadata = radio.selectTrackUpdate()
+
+		if not active:
+			continue
 
 		if ("name" in metadata):
 			display.display(metadata["name"], 1)
@@ -22,9 +27,10 @@ def updateTrackData():
 def watchInputDevices():
 	rotaryA = pins.pin(0, direction=In, interrupt=Both, pull=PullUp)
 	rotaryB = pins.pin(7, direction=In, interrupt=Both, pull=PullUp)
-	switch = pins.pin(2, direction=In, interrupt=Rising, pull=PullUp)
+	switch = pins.pin(2, direction=In, interrupt=Falling, pull=PullUp)
 
 	with rotaryA, rotaryB, switch:
+		global active
 		seq = (1 ^ 1) | 1 << 1
 		delta = 0
 		deltaaccu = 0
@@ -36,7 +42,15 @@ def watchInputDevices():
 			events = epoll.poll()
 			for fileno, event in events:
 				if fileno == switch.fileno():
-					print("SWITCH PRESSED")
+					if (switch.value == 0):
+						print("SWITCH PRESSED")
+						if active:
+							display.disable()
+							radio.stop()
+						else:
+							display.enable()
+							radio.play()
+						active = not active
 				else:
 					a = rotaryA.value
 					b = rotaryB.value
@@ -53,20 +67,22 @@ def watchInputDevices():
 						if (deltaaccu >= 4):
 							deltaaccu = 0
 							print("NEXT")
-							display.loading()
+							display.status("loading")
 							radio.next()
 						elif (deltaaccu <= -4):
 							deltaaccu = 0
 							print("PREV")
-							display.loading()
+							display.status("loading")
 							radio.prev()
 						seq = newseq
 
 display = LCD()
-radio = Radio()
+display.enable()
 
+radio = Radio()
 
 trackDataThread = _thread.start_new_thread(updateTrackData, ())
 watchInputDevices()
+
 
 radio.shutdown()
