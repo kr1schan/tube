@@ -5,6 +5,7 @@ import re
 from quick2wire.i2c import I2CMaster, writing
 import unicodedata
 import threading
+import string
 
 # LCD Address
 ADDRESS = 0x3f
@@ -90,44 +91,45 @@ class LCD(object):
 			i2c.transaction(writing(0x3f, [(data & ~En) | LCD_BACKLIGHT]))
 			sleep(0.0001)
 
-	def sanitise(self, string):
-		sanitised = string.replace('ä', "ae")
+	def sanitise(self, s):
+		sanitised = s.replace('ä', "ae")
 		sanitised = sanitised.replace('ö', "oe")
 		sanitised = sanitised.replace('Ã¶',"oe")
 		sanitised = sanitised.replace('ü', "ue")
 		sanitised = sanitised.replace('Ã¼', "ue")
 		return sanitised
  
-	def display(self, string, line):
+	def display(self, s, line):
 		self.displaySemaphore.acquire()
-		self._display(string, line)
+		self._display(s, line)
 		self.displaySemaphore.release()
 
-	def _display(self, string, line):
-		string = self.sanitise(string)
+	def _display(self, s, line):
+		s = self.sanitise(s)
 
 		if line == 1:
-			self._wrapLine(string, line)
+			self._wrapLine(s, line)
 			self.write(0x80)
 		if line == 2:
 			self.write(0xC0)
 		if line == 3:
-			self._wrapLine(string, line)
+			self._wrapLine(s, line)
 			self.write(0x94)
 		if line == 4:
 			self.write(0xD4)
 		
-		if (len(string) < 20):
-			string = string + EMPTYLINE[:20-len(string)]
-		if (len(string) > 20):
-			string = string[:20]
+		if (len(s) < 20):
+			s = s + EMPTYLINE[:20-len(s)]
+		if (len(s) > 20):
+			s = s[:20]
 
-		for char in string:
-			self.write(ord(char), Rs)
+		for char in s:
+			if char in  string.printable:
+				self.write(ord(char), Rs)
 
-	def _wrapLine(self, string, line):
-		if len(string) > 20:
-			self._display(string[20:], line+1)
+	def _wrapLine(self, s, line):
+		if len(s) > 20:
+			self._display(s[20:], line+1)
 		else:
 			self._display(EMPTYLINE, line+1)
 	
