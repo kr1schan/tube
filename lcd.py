@@ -79,16 +79,19 @@ class LCD(object):
 		self.write4BitCode(mode | ((cmd << 4) & 0xF0))
 
 	def write4BitCode(self, data):
-		with I2CMaster() as i2c:
-			i2c.transaction(writing(0x3f, [data | LCD_BACKLIGHT]))
-			sleep(0.0001)
+		self.i2cWrite([data | LCD_BACKLIGHT])
 		self.lcdStrobe(data)
 	
 	def lcdStrobe(self, data):
+		self.i2cWrite([data | En | LCD_BACKLIGHT])
+		self.i2cWrite([(data & ~En) | LCD_BACKLIGHT])
+
+	def i2cWrite(self, data):
 		with I2CMaster() as i2c:
-			i2c.transaction(writing(0x3f, [data | En | LCD_BACKLIGHT]))
-			sleep(0.0005)
-			i2c.transaction(writing(0x3f, [(data & ~En) | LCD_BACKLIGHT]))
+			try:
+				i2c.transaction(writing(0x3f, data))
+			except:
+				print("FOO")
 			sleep(0.0001)
 
 	def sanitise(self, s):
