@@ -5,6 +5,7 @@ from radio import Radio
 from mpd import MPDClient
 from time import sleep
 from quick2wire.gpio import pins, In, Both, Falling, PullUp
+import configparser
 import _thread
 import select
 import math
@@ -76,13 +77,15 @@ def watchInputDevices():
 							radio.prev()
 						seq = newseq
 
-display = LCD()
+config = configparser.ConfigParser()
+config.read("tube.cfg")
+
+display = LCD(config["display"]["address"])
 display.enable()
 
-radio = Radio()
+radio = Radio(config["radio"]["stations"].splitlines())
 
 trackDataThread = _thread.start_new_thread(updateTrackData, ())
 watchInputDevices()
-
 
 radio.shutdown()

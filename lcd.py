@@ -6,9 +6,7 @@ from quick2wire.i2c import I2CMaster, writing
 import unicodedata
 import threading
 import string
-
-# LCD Address
-ADDRESS = 0x3f
+import binascii
 
 # commands
 LCD_CLEARDISPLAY = 0x01
@@ -62,7 +60,8 @@ class LCD(object):
 	active = False	
 	displaySemaphore = threading.Semaphore()
 
-	def __init__(self):
+	def __init__(self, address):
+		self.address = int(address,16)
 		self.write(0x03)
 		self.write(0x03)
 		self.write(0x03)
@@ -89,9 +88,10 @@ class LCD(object):
 	def i2cWrite(self, data):
 		with I2CMaster() as i2c:
 			try:
-				i2c.transaction(writing(0x3f, data))
+				i2c.transaction(writing(self.address, data))
 			except:
-				print("FOO")
+				print("Display powerd off")
+				pass
 			sleep(0.0001)
 
 	def sanitise(self, s):
