@@ -61,6 +61,7 @@ class LCD(object):
 	displaySemaphore = threading.Semaphore()
 
 	def __init__(self, address):
+		self.backlight = LCD_BACKLIGHT
 		self.address = int(address,16)
 		self.write(0x03)
 		self.write(0x03)
@@ -73,24 +74,27 @@ class LCD(object):
 		self.write(LCD_ENTRYMODESET | LCD_ENTRYLEFT)
 		sleep(1)
 
+	def disableBacklight(self):
+		self.backlight = LCD_NOBACKLIGHT
+
 	def write(self, cmd, mode=0):
 		self.write4BitCode(mode | (cmd & 0xF0))
 		self.write4BitCode(mode | ((cmd << 4) & 0xF0))
 
 	def write4BitCode(self, data):
-		self.i2cWrite([data | LCD_BACKLIGHT])
+		self.i2cWrite([data | self.backlight])
 		self.lcdStrobe(data)
 	
 	def lcdStrobe(self, data):
-		self.i2cWrite([data | En | LCD_BACKLIGHT])
-		self.i2cWrite([(data & ~En) | LCD_BACKLIGHT])
+		self.i2cWrite([data | En | self.backlight])
+		self.i2cWrite([(data & ~En) | self.backlight])
 
 	def i2cWrite(self, data):
 		with I2CMaster() as i2c:
 			try:
 				i2c.transaction(writing(self.address, data))
 			except:
-				print("Display powerd off")
+				print("Display powered off")
 				pass
 			sleep(0.0001)
 
@@ -141,7 +145,10 @@ class LCD(object):
 		self.write(LCD_CLEARDISPLAY)
 		self.write(LCD_RETURNHOME)
 
-	def disable(self):	
+	def disable(self):
+		self.write(LCD_DISPLAYCONTROL | LCD_DISPLAYOFF)
+		sleep(1)
+		self.disableBacklight()	
 		self.status("stop")
 		self.active = False
 
